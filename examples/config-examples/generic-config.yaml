@@ -1,0 +1,40 @@
+# Generic Markdown Configuration Example
+# Universal Markdown Audio Transcription System
+
+# Basic paths
+vault_path: "./vault"  # Change to your actual vault path
+audio_folder_name: "media"
+transcripts_folder_name: "transcripts"
+temp_dir: "/tmp"
+
+# Templates (relative to project root)
+transcript_template_path: "templates/transcript-template.md"
+link_template_path: "templates/link-template.md"
+
+# Whisper settings
+whisper_model: "medium"
+language: "auto"
+
+# System settings
+log_file: "/var/log/markdown-transcription.log"
+lock_file: "/var/lock/markdown-transcription.lock"
+encoding: "utf-8"
+
+# File extensions
+audio_extensions: [".mp3", ".wav", ".m4a", ".flac", ".ogg", ".aac", ".wma"]
+video_extensions: [".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm"]
+
+# Generic markdown link format
+link_format_prefix: "📝 **Transcript:**"
+link_format_style: "standard"
+
+# Processing options
+auto_move_files: true
+create_timestamps: true
+skip_existing_transcripts: true
+recursive_search: true
+
+# Logging
+log_level: "INFO"
+console_logging: true
+file_logging: true
