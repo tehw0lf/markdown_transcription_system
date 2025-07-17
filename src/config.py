@@ -31,7 +31,7 @@ class ConfigManager:
         
         # Whisper settings
         "whisper_model": "medium",
-        "language": "auto",
+        "language": "de",
         
         # System settings
         "log_file": "/var/log/markdown-transcription.log",
