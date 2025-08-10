@@ -17,7 +17,7 @@ jobs:
       packages: write
     with:
       event_name: ${{ github.event_name }}
-      install: "apt-get install curl && curl -LsSf https://astral.sh/uv/install.sh | sh"
+      install: install_test.sh
       test: test_system.sh
       tool: bash
     secrets: inherit
