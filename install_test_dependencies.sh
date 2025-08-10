@@ -1,5 +1,5 @@
 #!/bin/bash
 
-sudo apt-get install curl ffmpeg
+sudo apt update
+sudo apt install curl ffmpeg python3-openai-whisper
 curl -LsSf https://astral.sh/uv/install.sh | sh
-uv pip install -U openai-whisper --system
