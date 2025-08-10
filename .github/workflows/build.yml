@@ -17,6 +17,6 @@ jobs:
       packages: write
     with:
       event_name: ${{ github.event_name }}
-      test: test_system.sh
-      tool: bash
+      test: "run bash test_system.sh"
+      tool: uv
     secrets: inherit
