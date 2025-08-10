@@ -17,5 +17,5 @@ jobs:
     with:
       event_name: ${{ github.event_name }}
       install: install_test_dependencies.sh
-      test: -c "echo y | ./test_system.sh"
+      test: test_system.sh
       tool: bash

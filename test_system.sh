@@ -428,35 +428,31 @@ echo ""
 
 # Ask if user wants to test transcription
 if [ -f "test-vault/test-audio.mp3" ]; then
-    echo "Would you like to test actual transcription? (y/n)"
-    read -r response
-    if [[ "$response" =~ ^[Yy]$ ]]; then
-        print_step "Installing whisper for transcription test..."
-        uv pip install openai-whisper
+    print_step "Installing whisper for transcription test..."
+    uv pip install openai-whisper
+    
+    print_step "Running transcription test..."
+    python -m src.transcription_system --config working-config.yaml
+    
+    print_step "Checking results..."
+    if [ -f "test-vault/Audio-Transcripts/test-audio_transcript.md" ]; then
+        print_success "Transcription test successful!"
+        print_info "Transcript created: test-vault/Audio-Transcripts/test-audio_transcript.md"
         
-        print_step "Running transcription test..."
-        python -m src.transcription_system --config working-config.yaml
-        
-        print_step "Checking results..."
-        if [ -f "test-vault/Audio-Transcripts/test-audio_transcript.md" ]; then
-            print_success "Transcription test successful!"
-            print_info "Transcript created: test-vault/Audio-Transcripts/test-audio_transcript.md"
-            
-            # Show first few lines of transcript
-            echo ""
-            echo "📝 Transcript preview:"
-            head -10 "test-vault/Audio-Transcripts/test-audio_transcript.md"
-            echo ""
-        else
-            print_warning "Transcription test didn't create expected file"
-        fi
-        
-        # Check if link was added to note
-        if grep -q "test-audio_transcript" "test-vault/notes/test-note.md"; then
-            print_success "Link successfully added to note!"
-        else
-            print_warning "Link was not added to note"
-        fi
+        # Show first few lines of transcript
+        echo ""
+        echo "📝 Transcript preview:"
+        head -10 "test-vault/Audio-Transcripts/test-audio_transcript.md"
+        echo ""
+    else
+        print_warning "Transcription test didn't create expected file"
+    fi
+    
+    # Check if link was added to note
+    if grep -q "test-audio_transcript" "test-vault/notes/test-note.md"; then
+        print_success "Link successfully added to note!"
+    else
+        print_warning "Link was not added to note"
     fi
 fi
 
