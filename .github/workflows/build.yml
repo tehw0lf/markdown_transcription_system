@@ -1,0 +1,21 @@
+name: build pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  build:
+    name: external workflow
+    uses: tehw0lf/workflows/.github/workflows/build-test-publish.yml@main
+    permissions:
+      actions: write
+      contents: write
+      packages: write
+    with:
+      event_name: ${{ github.event_name }}
+      test: "bash test_system.sh"
+    secrets: inherit
