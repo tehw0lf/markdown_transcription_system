@@ -1,4 +1,4 @@
 #!/bin/bash
 
-apt-get install curl
+sudo apt-get install curl ffmpeg python-openai-whisper
 curl -LsSf https://astral.sh/uv/install.sh | sh
