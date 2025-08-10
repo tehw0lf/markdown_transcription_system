@@ -1,4 +1,4 @@
-name: build pipeline
+name: test pipeline
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   pull_request:
 
 jobs:
-  build:
+  test:
     name: external workflow
     uses: tehw0lf/workflows/.github/workflows/build-test-publish.yml@main
     permissions:
