@@ -163,9 +163,13 @@ All tests completed successfully!
 
 **Missing Dependencies:**
 ```bash
-# Install missing dependencies
-uv pip install openai-whisper
-# or
+# Install Whisper system-wide (recommended):
+sudo apt install python-openai-whisper
+
+# Or global pip installation:
+pip install --global openai-whisper
+
+# Install other dependencies:
 pip install -r requirements.txt
 ```
 

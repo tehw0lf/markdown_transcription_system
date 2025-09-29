@@ -117,7 +117,7 @@ class MarkdownTranscriptionSystem:
             subprocess.run(["whisper", "--help"], capture_output=True, check=True)
             return True
         except (subprocess.CalledProcessError, FileNotFoundError):
-            self.logger.error("Whisper is not installed! Install with: pip install openai-whisper")
+            self.logger.error("Whisper is not installed! Install with: sudo apt install python-openai-whisper OR pip install --global openai-whisper")
             return False
     
     def find_media_files(self) -> List[Path]:

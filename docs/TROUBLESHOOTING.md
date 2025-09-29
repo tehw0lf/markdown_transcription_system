@@ -27,8 +27,8 @@ If the test script reveals issues, continue with manual diagnostics below.
 # Check Python version
 python3 --version
 
-# Check if Whisper is installed
-python -c "import whisper; print('Whisper installed')"
+# Check if Whisper is installed (system-wide command)
+whisper --help
 
 # Check FFmpeg
 ffmpeg -version
@@ -63,24 +63,23 @@ with open('config.yaml', 'r') as f:
 
 **Symptoms:**
 ```
-Error: Whisper is not installed! Install with: pip install openai-whisper
+Error: Whisper is not installed! Install with: sudo apt install python-openai-whisper OR pip install --global openai-whisper
 ```
 
 **Solutions:**
 ```bash
-# Basic installation
-pip install openai-whisper
+# Recommended: Package manager installation (Ubuntu/Debian)
+sudo apt install python-openai-whisper
 
-# If using virtual environment
-source .venv/bin/activate
-pip install openai-whisper
+# Alternative: Global pip installation
+pip install --global openai-whisper
 
-# Force reinstall
+# Force reinstall (global)
 pip uninstall openai-whisper
-pip install openai-whisper
+pip install --global openai-whisper
 
-# Install specific version
-pip install openai-whisper==20231117
+# Install specific version (global)
+pip install --global openai-whisper==20231117
 ```
 
 **Alternative: Manual Installation:**
@@ -544,7 +543,7 @@ which python3
 echo ""
 
 echo "=== Dependencies ==="
-python3 -c "import whisper; print('Whisper: OK')" 2>/dev/null || echo "Whisper: MISSING"
+whisper --help >/dev/null 2>&1 && echo "Whisper: OK" || echo "Whisper: MISSING"
 python3 -c "import yaml; print('PyYAML: OK')" 2>/dev/null || echo "PyYAML: MISSING"
 ffmpeg -version 2>/dev/null | head -1 || echo "FFmpeg: MISSING"
 echo ""

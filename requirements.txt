@@ -1,15 +1,18 @@
 # Universal Markdown Audio Transcription System Requirements
 
-# Core transcription engine
-openai-whisper>=20231117
-
 # Configuration support
 PyYAML>=6.0
 
-# Audio/video processing dependencies (automatically installed with whisper)
-torch>=2.0.0
-torchaudio>=2.0.0
+# Audio/video processing dependencies
 ffmpeg-python>=0.2.0
+
+# Note: This system uses system-wide installed whisper via subprocess calls
+#
+# Preferred installation methods:
+# 1. Package manager (recommended): sudo apt install python-openai-whisper (Ubuntu/Debian)
+# 2. Global pip installation: pip install --global openai-whisper
+#
+# The system calls the 'whisper' command directly, not the Python module
 
 # Optional: For advanced audio processing
 # librosa>=0.10.0

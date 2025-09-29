@@ -21,11 +21,16 @@ A professional, **completely local and private** audio transcription system that
 # Install Python dependencies
 pip install -r requirements.txt
 
-# Install system dependencies (Ubuntu/Debian)
-sudo apt update && sudo apt install ffmpeg
+# Install Whisper (choose one method):
+# Method 1 - Package manager (recommended for Ubuntu/Debian):
+sudo apt update && sudo apt install python-openai-whisper ffmpeg
+
+# Method 2 - Global pip installation:
+pip install --global openai-whisper
 
 # Install system dependencies (macOS with Homebrew)
 brew install ffmpeg
+# For macOS, use global pip: pip install --global openai-whisper
 ```
 
 ### 2. Create Configuration
@@ -137,12 +142,17 @@ cd markdown-audio-transcription
 # Install dependencies
 pip install -r requirements.txt
 
-# Install system dependencies
-# Ubuntu/Debian:
-sudo apt install ffmpeg
+# Install Whisper and system dependencies
+# Ubuntu/Debian (recommended):
+sudo apt install python-openai-whisper ffmpeg
+
 # macOS:
 brew install ffmpeg
-# Windows: Download from https://ffmpeg.org/download.html
+pip install --global openai-whisper
+
+# Windows:
+# Download ffmpeg from https://ffmpeg.org/download.html
+# pip install --global openai-whisper
 ```
 
 ### Option 2: Using the Install Script
@@ -364,9 +374,11 @@ done
 
 **1. "Whisper is not installed" error**
 ```bash
-pip install openai-whisper
-# or
-pip install -r requirements.txt
+# Method 1 - Package manager (recommended for Ubuntu/Debian):
+sudo apt install python-openai-whisper
+
+# Method 2 - Global pip installation:
+pip install --global openai-whisper
 ```
 
 **2. "ffmpeg not found" error**

@@ -395,7 +395,9 @@ cat > test-report.md << EOF
 
 ### 🎯 Next Steps
 1. If all tests passed, you can safely use the system
-2. To test with real transcription, install whisper: \`uv pip install openai-whisper\`
+2. To use with real transcription, install whisper system-wide:
+   - Ubuntu/Debian: \`sudo apt install python-openai-whisper\`
+   - Other systems: \`pip install --global openai-whisper\`
 3. Copy working-config.yaml and modify paths to your actual vault
 4. Test with a small audio file first
 
@@ -420,7 +422,7 @@ print_info "Next steps:"
 echo "  1. Review the test report: cat test-report.md"
 echo "  2. Copy working-config.yaml and modify for your setup"
 echo "  3. Test with a small audio file first"
-echo "  4. Install whisper if you want to test transcription: uv pip install openai-whisper"
+echo "  4. Install whisper system-wide: sudo apt install python-openai-whisper OR pip install --global openai-whisper"
 echo ""
 print_warning "Remember: This test used a temporary environment"
 print_warning "For real use, install dependencies in your main environment or create a dedicated one"
@@ -428,11 +430,18 @@ echo ""
 
 # Ask if user wants to test transcription
 if [ -f "test-vault/test-audio.mp3" ]; then
-    print_step "Installing whisper for transcription test..."
-    uv pip install openai-whisper
-    
-    print_step "Running transcription test..."
-    python -m src.transcription_system --config working-config.yaml
+    print_step "Checking for system-wide whisper installation..."
+    if command -v whisper &> /dev/null; then
+        print_success "System-wide whisper found, running transcription test..."
+        python -m src.transcription_system --config working-config.yaml
+    else
+        print_warning "System-wide whisper not found. Installing for this test only..."
+        print_info "Recommended: Install system-wide with 'sudo apt install python-openai-whisper'"
+        uv pip install openai-whisper
+
+        print_step "Running transcription test..."
+        python -m src.transcription_system --config working-config.yaml
+    fi
     
     print_step "Checking results..."
     if [ -f "test-vault/Audio-Transcripts/test-audio_transcript.md" ]; then

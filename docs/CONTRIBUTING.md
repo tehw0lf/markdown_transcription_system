@@ -208,7 +208,11 @@ Fixes #456
 
 1. **Whisper Installation Problems**
    ```bash
-   pip install --upgrade openai-whisper
+   # Recommended: Package manager installation (Ubuntu/Debian)
+   sudo apt install python-openai-whisper
+
+   # Alternative: Global pip installation
+   pip install --global openai-whisper --upgrade
    ```
 
 2. **FFmpeg Not Found**
