@@ -11,7 +11,7 @@ jobs:
     name: external workflow
     uses: tehw0lf/workflows/.github/workflows/build-test-publish.yml@main
     permissions:
-      id-token: write    # REQUIRED - Always needed for OIDC (npm Trusted Publishing + future integrations)
+      id-token: write
       actions: write
       contents: write
       packages: write
@@ -20,3 +20,4 @@ jobs:
       install: install_test_dependencies.sh
       test: test_system.sh
       tool: bash
+      publish_python_libraries: "false"
