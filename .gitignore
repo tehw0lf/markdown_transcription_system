@@ -206,6 +206,7 @@ logs/
 
 # Lock files
 *.lock
+!uv.lock
 
 # Temporary files
 tmp/

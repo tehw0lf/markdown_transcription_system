@@ -158,10 +158,8 @@ class MarkdownTranscriptionSystem:
                 "whisper",
                 str(file_path),
                 "--model", self.config.get("whisper_model"),
-                "--word_timestamps", "True",
                 "--output_format", "json",
-                "--output_dir", str(temp_dir),
-                "--verbose", "False"
+                "--output_dir", str(temp_dir)
             ]
             
             # Add language parameter if not auto
