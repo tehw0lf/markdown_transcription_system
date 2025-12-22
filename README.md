@@ -18,30 +18,32 @@ A professional, **completely local and private** audio transcription system that
 ### 1. Install Dependencies
 
 ```bash
-# Install Python dependencies
-pip install -r requirements.txt
+# Install system dependencies (required: ffmpeg for audio processing)
+# Ubuntu/Debian:
+sudo apt update && sudo apt install ffmpeg
 
-# Install Whisper (choose one method):
-# Method 1 - Package manager (recommended for Ubuntu/Debian):
-sudo apt update && sudo apt install python-openai-whisper ffmpeg
-
-# Method 2 - Global pip installation:
-pip install --global openai-whisper
-
-# Install system dependencies (macOS with Homebrew)
+# macOS with Homebrew:
 brew install ffmpeg
-# For macOS, use global pip: pip install --global openai-whisper
+
+# Arch Linux:
+sudo pacman -S ffmpeg
+
+# Install Python dependencies using UV (recommended)
+uv sync
+
+# Alternative: Use the installation script
+chmod +x scripts/install.sh && ./scripts/install.sh
 ```
 
 ### 2. Create Configuration
 
 ```bash
 # Create example configuration for your markdown system
-python -m src.transcription_system --create-config config.yaml --config-type obsidian
+uv run python -m src.transcription_system --create-config config.yaml --config-type obsidian
 
 # Or create for other systems
-python -m src.transcription_system --create-config config.yaml --config-type logseq
-python -m src.transcription_system --create-config config.yaml --config-type foam
+uv run python -m src.transcription_system --create-config config.yaml --config-type logseq
+uv run python -m src.transcription_system --create-config config.yaml --config-type foam
 ```
 
 ### 3. Edit Configuration
@@ -80,7 +82,7 @@ link_format_prefix: "📝 **Transcript:**"
 
 ```bash
 # Run with your configuration
-python -m src.transcription_system --config config.yaml
+uv run python -m src.transcription_system --config config.yaml
 ```
 
 ## 🧪 Testing

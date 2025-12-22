@@ -9,12 +9,13 @@ import json
 import re
 import time
 import logging
-import subprocess
 from pathlib import Path
 from datetime import datetime
 from typing import List, Optional, Dict, Tuple
 import fcntl
 import shutil
+
+import whisper
 
 from .config import ConfigManager, ConfigurationError
 
@@ -28,15 +29,18 @@ class MarkdownTranscriptionSystem:
         self.transcripts_folder = self.config.get_transcripts_folder()
         self.supported_extensions = self.config.get_supported_extensions()
         self.encoding = self.config.get("encoding")
-        
+
         # Set up logging
         self.setup_logging()
-        
+
         # Create directories
         self.setup_directories()
-        
+
         # Load templates
         self.load_templates()
+
+        # Load Whisper model (lazy loading - only when needed)
+        self.whisper_model = None
     
     def setup_logging(self):
         """Set up logging configuration"""
@@ -114,10 +118,11 @@ class MarkdownTranscriptionSystem:
     def check_dependencies(self) -> bool:
         """Check if required dependencies are installed"""
         try:
-            subprocess.run(["whisper", "--help"], capture_output=True, check=True)
+            # Check if whisper module is available
+            import whisper
             return True
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            self.logger.error("Whisper is not installed! Install with: sudo apt install python-openai-whisper OR pip install --global openai-whisper")
+        except ImportError:
+            self.logger.error("Whisper is not installed! Install with: uv add openai-whisper")
             return False
     
     def find_media_files(self) -> List[Path]:
@@ -146,62 +151,102 @@ class MarkdownTranscriptionSystem:
         
         return media_files
     
+    def load_whisper_model(self):
+        """Load Whisper model (lazy loading)"""
+        if self.whisper_model is None:
+            model_name = self.config.get("whisper_model")
+            self.logger.info(f"Loading Whisper model: {model_name}")
+            self.whisper_model = whisper.load_model(model_name)
+            self.logger.info("✓ Whisper model loaded successfully")
+        return self.whisper_model
+
     def transcribe_file(self, file_path: Path) -> bool:
-        """Transcribe a single media file using Whisper"""
+        """Transcribe a single media file using Whisper Python API"""
         self.logger.info(f"Transcribing: {file_path.name}")
-        
-        temp_dir = Path(self.config.get("temp_dir"))
-        
+
         try:
-            # Prepare Whisper command
-            cmd = [
-                "whisper",
-                str(file_path),
-                "--model", self.config.get("whisper_model"),
-                "--output_format", "json",
-                "--output_dir", str(temp_dir)
-            ]
-            
+            # Load Whisper model
+            model = self.load_whisper_model()
+
+            # Prepare transcription options
+            transcribe_options = {
+                "verbose": False
+            }
+
             # Add language parameter if not auto
-            if self.config.get("language") != "auto":
-                cmd.extend(["--language", self.config.get("language")])
-            
-            # Run Whisper
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            
-            if result.returncode != 0:
-                self.logger.error(f"Whisper failed for {file_path.name}: {result.stderr}")
-                return False
-            
-            # Process the JSON output
-            json_file = temp_dir / f"{file_path.stem}.json"
-            if json_file.exists():
-                success = self.create_markdown_transcript(json_file, file_path)
-                
-                # Clean up temp files
-                for temp_file in temp_dir.glob(f"{file_path.stem}.*"):
-                    temp_file.unlink()
-                
-                if success:
-                    # Move media file to audio folder if configured
-                    if self.config.get("auto_move_files", True):
-                        destination = self.audio_folder / file_path.name
-                        shutil.move(str(file_path), str(destination))
-                        self.logger.info(f"✓ Moved {file_path.name} to {self.config.get('audio_folder_name')} folder")
-                        
-                        # Fix ownership if specified
-                        self.fix_ownership(destination)
-                    
-                    return True
-            
+            language = self.config.get("language")
+            if language and language != "auto":
+                transcribe_options["language"] = language
+
+            # Transcribe using Whisper Python API
+            self.logger.info(f"Running Whisper transcription...")
+            result = model.transcribe(str(file_path), **transcribe_options)
+
+            # Create markdown transcript directly from result
+            success = self.create_markdown_transcript_from_result(result, file_path)
+
+            if success:
+                # Move media file to audio folder if configured
+                if self.config.get("auto_move_files", True):
+                    destination = self.audio_folder / file_path.name
+                    shutil.move(str(file_path), str(destination))
+                    self.logger.info(f"✓ Moved {file_path.name} to {self.config.get('audio_folder_name')} folder")
+
+                    # Fix ownership if specified
+                    self.fix_ownership(destination)
+
+                return True
+
             return False
-            
+
         except Exception as e:
             self.logger.error(f"Error transcribing {file_path.name}: {e}")
             return False
     
+    def create_markdown_transcript_from_result(self, result: dict, original_file: Path) -> bool:
+        """Create a markdown transcript from Whisper API result using templates"""
+        try:
+            transcript_file = self.transcripts_folder / f"{original_file.stem}_transcript.md"
+
+            # Prepare transcript content
+            transcript_content = ""
+            timestamp_content = ""
+
+            for segment in result.get('segments', []):
+                transcript_content += f"{segment.get('text', '').strip()}\n"
+
+                if self.config.get("create_timestamps", True):
+                    start_time = segment.get('start', 0)
+                    minutes = int(start_time // 60)
+                    seconds = int(start_time % 60)
+                    timestamp = f"**[{minutes}:{seconds:02d}]**"
+                    text = segment.get('text', '').strip()
+                    timestamp_content += f"{timestamp} {text}\n"
+
+            # Use template to create final content
+            content = self.transcript_template.format(
+                filename=original_file.name,
+                date=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                audio_folder=self.config.get("audio_folder_name"),
+                transcript_content=transcript_content.strip(),
+                timestamp_content=timestamp_content.strip()
+            )
+
+            with open(transcript_file, 'w', encoding=self.encoding) as f:
+                f.write(content)
+
+            # Fix ownership if specified
+            self.fix_ownership(transcript_file)
+
+            self.logger.info(f"✓ Transcript saved: {transcript_file.name}")
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Error creating transcript for {original_file.name}: {e}")
+            return False
+
     def create_markdown_transcript(self, json_file: Path, original_file: Path) -> bool:
-        """Create a markdown transcript from Whisper JSON output using templates"""
+        """Create a markdown transcript from Whisper JSON output using templates (legacy)"""
         try:
             with open(json_file, 'r', encoding=self.encoding) as f:
                 data = json.load(f)

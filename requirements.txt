@@ -1,19 +1,20 @@
 # Universal Markdown Audio Transcription System Requirements
-
-# Configuration support
+#
+# NOTE: This file is kept for compatibility, but UV users should use:
+#   uv sync
+#
+# UV will install dependencies from pyproject.toml which includes:
+# - PyYAML>=6.0
+# - ffmpeg-python>=0.2.0
+# - openai-whisper>=20250625 (local installation, no system-wide install needed!)
+#
+# For legacy pip users:
 PyYAML>=6.0
-
-# Audio/video processing dependencies
 ffmpeg-python>=0.2.0
+openai-whisper>=20250625
 
-# Note: This system uses system-wide installed whisper via subprocess calls
-#
-# Preferred installation methods:
-# 1. Package manager (recommended): sudo apt install python-openai-whisper (Ubuntu/Debian)
-# 2. Global pip installation: pip install --global openai-whisper
-#
-# The system calls the 'whisper' command directly, not the Python module
-
-# Optional: For advanced audio processing
-# librosa>=0.10.0
-# soundfile>=0.12.0
+# System dependencies (must be installed separately):
+# - ffmpeg (for audio/video processing)
+#   Ubuntu/Debian: sudo apt install ffmpeg
+#   macOS: brew install ffmpeg
+#   Arch Linux: sudo pacman -S ffmpeg
