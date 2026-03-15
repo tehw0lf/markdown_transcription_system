@@ -1,6 +1,6 @@
 [project]
 name = "markdown-transcription-system"
-version = "1.0.1"
+version = "1.0.2"
 description = "Universal Markdown Audio Transcription System - privacy-first local transcription tool"
 authors = [{name = "tehwolf"}]
 readme = "README.md"
