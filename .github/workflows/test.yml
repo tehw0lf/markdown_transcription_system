@@ -21,4 +21,3 @@ jobs:
       install: install_test_dependencies.sh
       test: test_system.sh
       tool: bash
-      publish_python_libraries: "false"
