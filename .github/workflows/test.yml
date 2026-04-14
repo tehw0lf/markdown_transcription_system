@@ -17,6 +17,7 @@ jobs:
       contents: write
       packages: write
       security-events: write
+      pull-requests: write
     with:
       install: install_test_dependencies.sh
       test: test_system.sh
