@@ -4,7 +4,7 @@ version = "1.0.3"
 description = "Universal Markdown Audio Transcription System - privacy-first local transcription tool"
 authors = [{name = "tehwolf"}]
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.14"
 dependencies = [
     "PyYAML>=6.0",
     "ffmpeg-python>=0.2.0",
