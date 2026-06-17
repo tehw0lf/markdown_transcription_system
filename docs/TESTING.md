@@ -292,7 +292,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ```bash
 # Check Python version
 python3 --version
-# Ensure Python 3.8+
+# Ensure Python 3.14+
 
 # Check directory structure
 ls -la src/
@@ -335,7 +335,7 @@ If tests fail:
 1. **Check the test report** - `test-report.md` contains detailed information
 2. **Review test output** - Look for specific error messages
 3. **Check dependencies** - Ensure all required packages are installed
-4. **Verify system requirements** - Python 3.8+, FFmpeg, etc.
+4. **Verify system requirements** - Python 3.14+, FFmpeg, etc.
 5. **Ask for help** - Create GitHub issue with test report attached
 
 ## 🎯 Next Steps

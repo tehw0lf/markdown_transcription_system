@@ -56,11 +56,11 @@ fi
 PYTHON_VERSION=$(python3 -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')
 print_info "Python version: $PYTHON_VERSION"
 
-# Check if Python version is >= 3.8
-if python3 -c "import sys; exit(0 if sys.version_info >= (3, 8) else 1)"; then
+# Check if Python version is >= 3.14
+if python3 -c "import sys; exit(0 if sys.version_info >= (3, 14) else 1)"; then
     print_info "Python version is compatible"
 else
-    print_error "Python 3.8 or higher is required"
+    print_error "Python 3.14 or higher is required"
     exit 1
 fi
 
@@ -93,7 +93,7 @@ elif [[ "$OS" == "macos" ]]; then
 elif [[ "$OS" == "windows" ]]; then
     print_warning "Windows detected. Please ensure you have:"
     print_warning "1. FFmpeg installed and in PATH"
-    print_warning "2. Python 3.8+ installed"
+    print_warning "2. Python 3.14+ installed"
     print_warning "3. Git installed"
 fi
 

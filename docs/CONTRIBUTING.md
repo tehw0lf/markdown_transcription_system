@@ -122,7 +122,7 @@ tests/
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.14+
 - FFmpeg
 - Git
 
