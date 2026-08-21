@@ -244,6 +244,37 @@ class TestLocking:
         finally:
             system.release_lock()
 
+    def test_failed_acquire_does_not_leak_a_descriptor(self, system):
+        """run() never calls release_lock() when acquire_lock() returns False."""
+        assert system.acquire_lock()
+        try:
+            other = MarkdownTranscriptionSystem(system.config)
+            for _ in range(50):
+                assert other.acquire_lock() is False
+            # Nothing was published, so there is no handle left dangling.
+            assert getattr(other, "lock_file", None) is None
+        finally:
+            system.release_lock()
+
+    def test_release_is_idempotent(self, system):
+        assert system.acquire_lock()
+        system.release_lock()
+        system.release_lock()  # must not raise on an already-closed handle
+
+    def test_release_without_acquire_is_safe(self, system):
+        system.release_lock()
+
+    def test_lock_can_be_reacquired_after_release(self, system):
+        assert system.acquire_lock()
+        system.release_lock()
+        assert system.acquire_lock()
+        system.release_lock()
+
+    def test_reports_failure_when_lock_file_cannot_be_opened(self, system, tmp_path):
+        unwritable = tmp_path / "no-such-dir" / "test.lock"
+        system.config.set("lock_file", str(unwritable))
+        assert system.acquire_lock() is False
+
 
 class TestDependencyCheck:
     """Whisper is imported lazily so this check can actually run.

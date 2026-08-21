@@ -69,6 +69,11 @@ fi
 
 print_info "Found uv: $(uv --version)"
 
+# Work from the repository root regardless of where the script was invoked
+# from, so uv/ruff/pytest find pyproject.toml and tests/.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$REPO_ROOT"
+
 # Store original directory
 ORIGINAL_DIR="$(pwd)"
 

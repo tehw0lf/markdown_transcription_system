@@ -102,20 +102,35 @@ class MarkdownTranscriptionSystem:
 
     def acquire_lock(self) -> bool:
         """Acquire file lock to prevent multiple instances"""
+        # The handle must stay open to hold the lock; release_lock() closes it.
+        # It is only published as self.lock_file once flock() has succeeded, so
+        # a failed attempt cannot leak a descriptor (run() never calls
+        # release_lock() on that path).
         try:
-            # The handle must stay open to hold the lock; release_lock() closes it.
-            self.lock_file = open(self.config.get("lock_file"), "w")  # noqa: SIM115
-            fcntl.flock(self.lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-            return True
+            lock_file = open(self.config.get("lock_file"), "w")  # noqa: SIM115
+        except OSError as e:
+            self.logger.error(f"Could not open lock file: {e}")
+            return False
+
+        try:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:
+            lock_file.close()
             self.logger.warning("Another instance is already running")
             return False
 
+        self.lock_file = lock_file
+        return True
+
     def release_lock(self):
         """Release the file lock"""
-        if hasattr(self, "lock_file"):
-            fcntl.flock(self.lock_file.fileno(), fcntl.LOCK_UN)
-            self.lock_file.close()
+        lock_file = getattr(self, "lock_file", None)
+        if lock_file is None or lock_file.closed:
+            return
+
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+        lock_file.close()
+        self.lock_file = None
 
     def check_dependencies(self) -> bool:
         """Check whether Whisper is importable.
