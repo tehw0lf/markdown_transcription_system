@@ -5,11 +5,34 @@ Supports JSON and YAML configuration files with validation and defaults.
 """
 
 import json
-import os
-import yaml
-from pathlib import Path
-from typing import Dict, Any, Optional, List
 import logging
+import re
+from pathlib import Path
+from typing import Any, Dict, List, Mapping, Optional
+
+import yaml
+
+# Placeholders in the transcript/link templates use the legacy ``{name}``
+# syntax. ``str.format`` is unusable here: it raises ``KeyError`` on an unknown
+# placeholder and ``ValueError`` on a literal brace (a JSON snippet in a
+# template, say), and either would discard a transcript that may have cost
+# minutes of GPU time. Substitute manually instead, leaving anything we cannot
+# resolve exactly as the author wrote it.
+TEMPLATE_PLACEHOLDER = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)\}")
+
+
+def render_template(template: str, values: Mapping[str, Any]) -> str:
+    """Render a template, leaving unknown placeholders and literal braces intact."""
+
+    def substitute(match: "re.Match[str]") -> str:
+        name = match.group(1)
+        if name in values:
+            return str(values[name])
+        # Unknown placeholder: keep the original text rather than failing.
+        return match.group(0)
+
+    return TEMPLATE_PLACEHOLDER.sub(substitute, template)
+
 
 class ConfigurationError(Exception):
     """Custom exception for configuration errors"""
@@ -83,7 +106,9 @@ class ConfigManager:
                 elif config_file.suffix.lower() in ['.yaml', '.yml']:
                     user_config = yaml.safe_load(f)
                 else:
-                    raise ConfigurationError(f"Unsupported configuration file format: {config_file.suffix}")
+                    raise ConfigurationError(
+                        f"Unsupported configuration file format: {config_file.suffix}"
+                    )
             
             # Merge with defaults
             self.config.update(user_config)
@@ -120,7 +145,9 @@ class ConfigManager:
         # Validate link format style
         valid_styles = ["wikilink", "standard", "custom"]
         if self.config["link_format_style"] not in valid_styles:
-            raise ConfigurationError(f"Invalid link format style: {self.config['link_format_style']}")
+            raise ConfigurationError(
+                f"Invalid link format style: {self.config['link_format_style']}"
+            )
         
         # Validate log level
         valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -194,10 +221,22 @@ class ConfigManager:
             # Load custom template
             try:
                 template = self.load_template("link")
-                return template.format(audio_name=audio_name)
-            except:
-                # Fallback to wikilink
+            except ConfigurationError as e:
+                self.logger.warning(
+                    f"Could not load custom link template, "
+                    f"falling back to wikilink: {e}"
+                )
                 return f"{prefix} [[{audio_name}_transcript]]"
+
+            if not template.strip():
+                self.logger.warning(
+                    "Custom link template is empty, falling back to wikilink"
+                )
+                return f"{prefix} [[{audio_name}_transcript]]"
+
+            return render_template(
+                template, {"audio_name": audio_name, "prefix": prefix}
+            ).strip()
     
     def save_config(self, config_path: str):
         """Save current configuration to file"""
@@ -210,7 +249,9 @@ class ConfigManager:
                 elif config_file.suffix.lower() in ['.yaml', '.yml']:
                     yaml.dump(self.config, f, default_flow_style=False, allow_unicode=True)
                 else:
-                    raise ConfigurationError(f"Unsupported configuration file format: {config_file.suffix}")
+                    raise ConfigurationError(
+                        f"Unsupported configuration file format: {config_file.suffix}"
+                    )
             
             self.logger.info(f"Configuration saved to {config_path}")
             
@@ -265,7 +306,9 @@ class ConfigManager:
                 elif config_file.suffix.lower() in ['.yaml', '.yml']:
                     yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
                 else:
-                    raise ConfigurationError(f"Unsupported configuration file format: {config_file.suffix}")
+                    raise ConfigurationError(
+                        f"Unsupported configuration file format: {config_file.suffix}"
+                    )
             
             self.logger.info(f"Example {config_type} configuration created at {config_path}")
             

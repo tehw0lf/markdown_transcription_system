@@ -72,6 +72,21 @@ print_info "Found uv: $(uv --version)"
 # Store original directory
 ORIGINAL_DIR="$(pwd)"
 
+# Static analysis and unit tests run in the project root, where pyproject.toml
+# and tests/ live, before we move into the throwaway integration directory.
+print_step "Syncing project environment (incl. dev tools)..."
+uv sync --quiet
+
+print_step "Running lint (ruff)..."
+uv run ruff check .
+print_success "Lint passed"
+
+print_step "Running unit tests (pytest)..."
+uv run pytest tests/ -q
+print_success "Unit tests passed"
+
+echo ""
+
 # Create test directory
 TEST_DIR="test_transcription_$(date +%Y%m%d_%H%M%S)"
 print_step "Creating test directory: $TEST_DIR"

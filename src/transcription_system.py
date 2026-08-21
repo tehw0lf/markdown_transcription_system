@@ -4,20 +4,18 @@ Universal Markdown Audio Transcription System
 Provides local, private, and free audio transcription for any markdown-based note-taking system.
 """
 
-import os
-import json
-import re
-import time
-import logging
-from pathlib import Path
-from datetime import datetime
-from typing import List, Optional, Dict, Tuple
 import fcntl
+import importlib
+import logging
+import re
 import shutil
+from datetime import datetime
+from pathlib import Path
+from typing import List, Tuple
 
 import whisper
 
-from .config import ConfigManager, ConfigurationError
+from .config import ConfigManager, ConfigurationError, render_template
 
 
 class MarkdownTranscriptionSystem:
@@ -122,7 +120,7 @@ class MarkdownTranscriptionSystem:
         """Check if required dependencies are installed"""
         try:
             # Check if whisper module is available
-            import whisper
+            importlib.import_module("whisper")
 
             return True
         except ImportError:
@@ -192,7 +190,7 @@ class MarkdownTranscriptionSystem:
                 transcribe_options["language"] = language
 
             # Transcribe using Whisper Python API
-            self.logger.info(f"Running Whisper transcription...")
+            self.logger.info("Running Whisper transcription...")
             result = model.transcribe(str(file_path), **transcribe_options)
 
             # Create markdown transcript directly from result
@@ -245,63 +243,15 @@ class MarkdownTranscriptionSystem:
                     timestamp_content += f"{timestamp} {text}\n"
 
             # Use template to create final content
-            content = self.transcript_template.format(
-                filename=original_file.name,
-                date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                audio_folder=self.config.get("audio_folder_name"),
-                transcript_content=transcript_content.strip(),
-                timestamp_content=timestamp_content.strip(),
-            )
-
-            with open(transcript_file, "w", encoding=self.encoding) as f:
-                f.write(content)
-
-            # Fix ownership if specified
-            self.fix_ownership(transcript_file)
-
-            self.logger.info(f"✓ Transcript saved: {transcript_file.name}")
-            return True
-
-        except Exception as e:
-            self.logger.error(
-                f"Error creating transcript for {original_file.name}: {e}"
-            )
-            return False
-
-    def create_markdown_transcript(
-        self, json_file: Path, original_file: Path
-    ) -> bool:
-        """Create a markdown transcript from Whisper JSON output using templates (legacy)"""
-        try:
-            with open(json_file, "r", encoding=self.encoding) as f:
-                data = json.load(f)
-
-            transcript_file = (
-                self.transcripts_folder / f"{original_file.stem}_transcript.md"
-            )
-
-            # Prepare transcript content
-            transcript_content = ""
-            timestamp_content = ""
-
-            for segment in data.get("segments", []):
-                transcript_content += f"{segment.get('text', '').strip()}\n"
-
-                if self.config.get("create_timestamps", True):
-                    start_time = segment.get("start", 0)
-                    minutes = int(start_time // 60)
-                    seconds = int(start_time % 60)
-                    timestamp = f"**[{minutes}:{seconds:02d}]**"
-                    text = segment.get("text", "").strip()
-                    timestamp_content += f"{timestamp} {text}\n"
-
-            # Use template to create final content
-            content = self.transcript_template.format(
-                filename=original_file.name,
-                date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                audio_folder=self.config.get("audio_folder_name"),
-                transcript_content=transcript_content.strip(),
-                timestamp_content=timestamp_content.strip(),
+            content = render_template(
+                self.transcript_template,
+                {
+                    "filename": original_file.name,
+                    "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "audio_folder": self.config.get("audio_folder_name"),
+                    "transcript_content": transcript_content.strip(),
+                    "timestamp_content": timestamp_content.strip(),
+                },
             )
 
             with open(transcript_file, "w", encoding=self.encoding) as f:
@@ -339,7 +289,6 @@ class MarkdownTranscriptionSystem:
         patterns = []
 
         for ext in self.supported_extensions:
-            ext_clean = ext.lstrip(".")
             # Direct embed pattern
             patterns.append(
                 rf"!\[\[{re.escape(audio_name)}{re.escape(ext)}\]\]"
@@ -399,8 +348,6 @@ class MarkdownTranscriptionSystem:
 
         # Generate replacements for each supported extension
         for ext in self.supported_extensions:
-            ext_clean = ext.lstrip(".")
-
             # Direct embed patterns
             pattern = rf"(!\[\[{re.escape(audio_name)}{re.escape(ext)}\]\])"
             replacement = f"\\1\n\n{transcript_link}"
