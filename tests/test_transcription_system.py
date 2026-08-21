@@ -243,3 +243,43 @@ class TestLocking:
             assert other.acquire_lock() is False
         finally:
             system.release_lock()
+
+
+class TestDependencyCheck:
+    """Whisper is imported lazily so this check can actually run.
+
+    With a module-level ``import whisper`` the process died on import and the
+    user got a raw traceback instead of the actionable message below.
+    """
+
+    def test_module_imports_without_whisper_installed(self):
+        import importlib
+
+        assert importlib.util.find_spec("src.transcription_system") is not None
+
+    def test_reports_true_when_whisper_is_available(self, system):
+        assert system.check_dependencies() is True
+
+    def test_reports_false_when_whisper_is_missing(self, system, monkeypatch):
+        import importlib
+
+        def missing(name, *args, **kwargs):
+            if name == "whisper":
+                raise ImportError("No module named 'whisper'")
+            return importlib.import_module(name, *args, **kwargs)
+
+        monkeypatch.setattr(
+            "src.transcription_system.importlib.import_module", missing
+        )
+        assert system.check_dependencies() is False
+
+    def test_no_module_level_whisper_import(self):
+        """Guard the lazy import: re-adding it would break check_dependencies."""
+        from pathlib import Path
+
+        import src.transcription_system as module
+
+        source = Path(module.__file__).read_text(encoding="utf-8")
+        header = source.split("class MarkdownTranscriptionSystem")[0]
+        assert "\nimport whisper" not in header
+        assert "\nfrom whisper" not in header

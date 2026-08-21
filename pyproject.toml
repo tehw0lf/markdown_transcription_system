@@ -34,7 +34,10 @@ testpaths = ["tests"]
 line-length = 100
 
 [tool.ruff.lint]
-# Pyflakes (F), pycodestyle errors (E) and import sorting (I).
-# Deliberately not enabling the stylistic/modernisation rulesets yet: they
-# flag a few dozen pre-existing issues that are worth their own pass.
-select = ["E", "F", "I"]
+select = ["E", "F", "I", "W", "UP", "B", "SIM", "C4", "PIE", "RUF"]
+ignore = [
+    # The broad `except Exception` handlers are deliberate: transcription can
+    # represent minutes of GPU time, so failures are logged and the run
+    # continues rather than aborting the batch.
+    "BLE001",
+]

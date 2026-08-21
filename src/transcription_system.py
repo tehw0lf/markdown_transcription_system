@@ -11,9 +11,6 @@ import re
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import List, Tuple
-
-import whisper
 
 from .config import ConfigManager, ConfigurationError, render_template
 
@@ -83,19 +80,22 @@ class MarkdownTranscriptionSystem:
         except ConfigurationError as e:
             self.logger.warning(f"Template loading error: {e}")
             # Fall back to basic templates
-            self.transcript_template = """# Transcription: {filename}
-
-**File:** `{filename}`  
-**Date:** {date}  
-**Original Location:** [[{audio_folder}/{filename}]]
-
-## Transcript
-
-{transcript_content}
-
-## Detailed Timestamps
-
-{timestamp_content}"""
+            # Note: the trailing "  " are Markdown hard line breaks.
+            self.transcript_template = (
+                "# Transcription: {filename}\n"
+                "\n"
+                "**File:** `{filename}`  \n"
+                "**Date:** {date}  \n"
+                "**Original Location:** [[{audio_folder}/{filename}]]\n"
+                "\n"
+                "## Transcript\n"
+                "\n"
+                "{transcript_content}\n"
+                "\n"
+                "## Detailed Timestamps\n"
+                "\n"
+                "{timestamp_content}"
+            )
             self.link_template = (
                 "📝 **Transcript:** [[{audio_name}_transcript]]"
             )
@@ -103,10 +103,11 @@ class MarkdownTranscriptionSystem:
     def acquire_lock(self) -> bool:
         """Acquire file lock to prevent multiple instances"""
         try:
-            self.lock_file = open(self.config.get("lock_file"), "w")
+            # The handle must stay open to hold the lock; release_lock() closes it.
+            self.lock_file = open(self.config.get("lock_file"), "w")  # noqa: SIM115
             fcntl.flock(self.lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             return True
-        except (IOError, OSError):
+        except OSError:
             self.logger.warning("Another instance is already running")
             return False
 
@@ -117,11 +118,15 @@ class MarkdownTranscriptionSystem:
             self.lock_file.close()
 
     def check_dependencies(self) -> bool:
-        """Check if required dependencies are installed"""
-        try:
-            # Check if whisper module is available
-            importlib.import_module("whisper")
+        """Check whether Whisper is importable.
 
+        Whisper is imported lazily (here and in load_whisper_model) rather than
+        at module level: a module-level import would abort the process before
+        this check could report the problem, and it drags in torch even for
+        runs that never transcribe anything.
+        """
+        try:
+            importlib.import_module("whisper")
             return True
         except ImportError:
             self.logger.error(
@@ -129,16 +134,12 @@ class MarkdownTranscriptionSystem:
             )
             return False
 
-    def find_media_files(self) -> List[Path]:
+    def find_media_files(self) -> list[Path]:
         """Find all media files that need transcription"""
         media_files = []
 
-        if self.config.get("recursive_search", True):
-            # Search recursively through all subdirectories
-            search_pattern = "**/*"
-        else:
-            # Search only in vault root
-            search_pattern = "*"
+        # Recursive search covers subdirectories; otherwise only the vault root.
+        search_pattern = "**/*" if self.config.get("recursive_search", True) else "*"
 
         for file_path in self.vault_path.glob(search_pattern):
             if (
@@ -169,6 +170,7 @@ class MarkdownTranscriptionSystem:
         if self.whisper_model is None:
             model_name = self.config.get("whisper_model")
             self.logger.info(f"Loading Whisper model: {model_name}")
+            whisper = importlib.import_module("whisper")
             self.whisper_model = whisper.load_model(model_name)
             self.logger.info("✓ Whisper model loaded successfully")
         return self.whisper_model
@@ -284,7 +286,7 @@ class MarkdownTranscriptionSystem:
                     f"Could not fix ownership for {file_path}: {e}"
                 )
 
-    def generate_audio_embed_patterns(self, audio_name: str) -> List[str]:
+    def generate_audio_embed_patterns(self, audio_name: str) -> list[str]:
         """Generate regex patterns for finding audio embeds based on supported extensions"""
         patterns = []
 
@@ -311,7 +313,7 @@ class MarkdownTranscriptionSystem:
 
         return patterns
 
-    def find_notes_with_audio(self, audio_name: str) -> List[Path]:
+    def find_notes_with_audio(self, audio_name: str) -> list[Path]:
         """Find all notes that contain references to a specific audio file"""
         notes_with_audio = []
         patterns = self.generate_audio_embed_patterns(audio_name)
@@ -339,7 +341,7 @@ class MarkdownTranscriptionSystem:
 
     def generate_transcript_link_replacements(
         self, audio_name: str
-    ) -> List[Tuple[str, str]]:
+    ) -> list[tuple[str, str]]:
         """Generate pattern-replacement pairs for adding transcript links"""
         replacements = []
 
