@@ -5,6 +5,9 @@ costs a few seconds at collection time. No model is ever loaded: transcription
 results are passed in as plain dicts, matching the shape whisper returns.
 """
 
+import errno
+import logging
+
 import pytest
 import yaml
 
@@ -274,6 +277,31 @@ class TestLocking:
         unwritable = tmp_path / "no-such-dir" / "test.lock"
         system.config.set("lock_file", str(unwritable))
         assert system.acquire_lock() is False
+
+    def test_contention_is_logged_as_a_warning(self, system, caplog):
+        assert system.acquire_lock()
+        try:
+            other = MarkdownTranscriptionSystem(system.config)
+            with caplog.at_level(logging.WARNING):
+                assert other.acquire_lock() is False
+            assert "Another instance is already running" in caplog.text
+        finally:
+            system.release_lock()
+
+    def test_non_contention_error_is_not_reported_as_a_second_instance(
+        self, system, monkeypatch, caplog
+    ):
+        """An EIO from flock() is a real failure, not a running sibling."""
+
+        def failing_flock(*args, **kwargs):
+            raise OSError(errno.EIO, "simulated filesystem failure")
+
+        monkeypatch.setattr("src.transcription_system.fcntl.flock", failing_flock)
+        with caplog.at_level(logging.WARNING):
+            assert system.acquire_lock() is False
+
+        assert "Another instance is already running" not in caplog.text
+        assert "Could not acquire lock" in caplog.text
 
 
 class TestDependencyCheck:

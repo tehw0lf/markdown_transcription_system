@@ -4,6 +4,7 @@ Universal Markdown Audio Transcription System
 Provides local, private, and free audio transcription for any markdown-based note-taking system.
 """
 
+import errno
 import fcntl
 import importlib
 import logging
@@ -114,9 +115,15 @@ class MarkdownTranscriptionSystem:
 
         try:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError:
+        except OSError as e:
             lock_file.close()
-            self.logger.warning("Another instance is already running")
+            # Contention is reported as EAGAIN on Linux and EACCES on some other
+            # Unices; anything else (EIO, ENOLCK, ...) is a real failure and must
+            # not be mistaken for a second instance.
+            if e.errno in (errno.EACCES, errno.EAGAIN):
+                self.logger.warning("Another instance is already running")
+            else:
+                self.logger.error(f"Could not acquire lock: {e}")
             return False
 
         self.lock_file = lock_file
