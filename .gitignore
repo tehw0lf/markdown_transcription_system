@@ -222,6 +222,7 @@ config-local.json
 test_audio/
 test_transcripts/
 test_transcription_*/
+test-report-*.md
 
 # User-specific configurations
 user-config.yaml

@@ -4,20 +4,16 @@ Universal Markdown Audio Transcription System
 Provides local, private, and free audio transcription for any markdown-based note-taking system.
 """
 
-import os
-import json
-import re
-import time
-import logging
-from pathlib import Path
-from datetime import datetime
-from typing import List, Optional, Dict, Tuple
+import errno
 import fcntl
+import importlib
+import logging
+import re
 import shutil
+from datetime import datetime
+from pathlib import Path
 
-import whisper
-
-from .config import ConfigManager, ConfigurationError
+from .config import ConfigManager, ConfigurationError, render_template
 
 
 class MarkdownTranscriptionSystem:
@@ -85,45 +81,74 @@ class MarkdownTranscriptionSystem:
         except ConfigurationError as e:
             self.logger.warning(f"Template loading error: {e}")
             # Fall back to basic templates
-            self.transcript_template = """# Transcription: {filename}
-
-**File:** `{filename}`  
-**Date:** {date}  
-**Original Location:** [[{audio_folder}/{filename}]]
-
-## Transcript
-
-{transcript_content}
-
-## Detailed Timestamps
-
-{timestamp_content}"""
+            # Note: the trailing "  " are Markdown hard line breaks.
+            self.transcript_template = (
+                "# Transcription: {filename}\n"
+                "\n"
+                "**File:** `{filename}`  \n"
+                "**Date:** {date}  \n"
+                "**Original Location:** [[{audio_folder}/{filename}]]\n"
+                "\n"
+                "## Transcript\n"
+                "\n"
+                "{transcript_content}\n"
+                "\n"
+                "## Detailed Timestamps\n"
+                "\n"
+                "{timestamp_content}"
+            )
             self.link_template = (
                 "📝 **Transcript:** [[{audio_name}_transcript]]"
             )
 
     def acquire_lock(self) -> bool:
         """Acquire file lock to prevent multiple instances"""
+        # The handle must stay open to hold the lock; release_lock() closes it.
+        # It is only published as self.lock_file once flock() has succeeded, so
+        # a failed attempt cannot leak a descriptor (run() never calls
+        # release_lock() on that path).
         try:
-            self.lock_file = open(self.config.get("lock_file"), "w")
-            fcntl.flock(self.lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-            return True
-        except (IOError, OSError):
-            self.logger.warning("Another instance is already running")
+            lock_file = open(self.config.get("lock_file"), "w")  # noqa: SIM115
+        except OSError as e:
+            self.logger.error(f"Could not open lock file: {e}")
             return False
+
+        try:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as e:
+            lock_file.close()
+            # Contention is reported as EAGAIN on Linux and EACCES on some other
+            # Unices; anything else (EIO, ENOLCK, ...) is a real failure and must
+            # not be mistaken for a second instance.
+            if e.errno in (errno.EACCES, errno.EAGAIN):
+                self.logger.warning("Another instance is already running")
+            else:
+                self.logger.error(f"Could not acquire lock: {e}")
+            return False
+
+        self.lock_file = lock_file
+        return True
 
     def release_lock(self):
         """Release the file lock"""
-        if hasattr(self, "lock_file"):
-            fcntl.flock(self.lock_file.fileno(), fcntl.LOCK_UN)
-            self.lock_file.close()
+        lock_file = getattr(self, "lock_file", None)
+        if lock_file is None or lock_file.closed:
+            return
+
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+        lock_file.close()
+        self.lock_file = None
 
     def check_dependencies(self) -> bool:
-        """Check if required dependencies are installed"""
-        try:
-            # Check if whisper module is available
-            import whisper
+        """Check whether Whisper is importable.
 
+        Whisper is imported lazily (here and in load_whisper_model) rather than
+        at module level: a module-level import would abort the process before
+        this check could report the problem, and it drags in torch even for
+        runs that never transcribe anything.
+        """
+        try:
+            importlib.import_module("whisper")
             return True
         except ImportError:
             self.logger.error(
@@ -131,16 +156,12 @@ class MarkdownTranscriptionSystem:
             )
             return False
 
-    def find_media_files(self) -> List[Path]:
+    def find_media_files(self) -> list[Path]:
         """Find all media files that need transcription"""
         media_files = []
 
-        if self.config.get("recursive_search", True):
-            # Search recursively through all subdirectories
-            search_pattern = "**/*"
-        else:
-            # Search only in vault root
-            search_pattern = "*"
+        # Recursive search covers subdirectories; otherwise only the vault root.
+        search_pattern = "**/*" if self.config.get("recursive_search", True) else "*"
 
         for file_path in self.vault_path.glob(search_pattern):
             if (
@@ -171,6 +192,7 @@ class MarkdownTranscriptionSystem:
         if self.whisper_model is None:
             model_name = self.config.get("whisper_model")
             self.logger.info(f"Loading Whisper model: {model_name}")
+            whisper = importlib.import_module("whisper")
             self.whisper_model = whisper.load_model(model_name)
             self.logger.info("✓ Whisper model loaded successfully")
         return self.whisper_model
@@ -192,7 +214,7 @@ class MarkdownTranscriptionSystem:
                 transcribe_options["language"] = language
 
             # Transcribe using Whisper Python API
-            self.logger.info(f"Running Whisper transcription...")
+            self.logger.info("Running Whisper transcription...")
             result = model.transcribe(str(file_path), **transcribe_options)
 
             # Create markdown transcript directly from result
@@ -245,63 +267,15 @@ class MarkdownTranscriptionSystem:
                     timestamp_content += f"{timestamp} {text}\n"
 
             # Use template to create final content
-            content = self.transcript_template.format(
-                filename=original_file.name,
-                date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                audio_folder=self.config.get("audio_folder_name"),
-                transcript_content=transcript_content.strip(),
-                timestamp_content=timestamp_content.strip(),
-            )
-
-            with open(transcript_file, "w", encoding=self.encoding) as f:
-                f.write(content)
-
-            # Fix ownership if specified
-            self.fix_ownership(transcript_file)
-
-            self.logger.info(f"✓ Transcript saved: {transcript_file.name}")
-            return True
-
-        except Exception as e:
-            self.logger.error(
-                f"Error creating transcript for {original_file.name}: {e}"
-            )
-            return False
-
-    def create_markdown_transcript(
-        self, json_file: Path, original_file: Path
-    ) -> bool:
-        """Create a markdown transcript from Whisper JSON output using templates (legacy)"""
-        try:
-            with open(json_file, "r", encoding=self.encoding) as f:
-                data = json.load(f)
-
-            transcript_file = (
-                self.transcripts_folder / f"{original_file.stem}_transcript.md"
-            )
-
-            # Prepare transcript content
-            transcript_content = ""
-            timestamp_content = ""
-
-            for segment in data.get("segments", []):
-                transcript_content += f"{segment.get('text', '').strip()}\n"
-
-                if self.config.get("create_timestamps", True):
-                    start_time = segment.get("start", 0)
-                    minutes = int(start_time // 60)
-                    seconds = int(start_time % 60)
-                    timestamp = f"**[{minutes}:{seconds:02d}]**"
-                    text = segment.get("text", "").strip()
-                    timestamp_content += f"{timestamp} {text}\n"
-
-            # Use template to create final content
-            content = self.transcript_template.format(
-                filename=original_file.name,
-                date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                audio_folder=self.config.get("audio_folder_name"),
-                transcript_content=transcript_content.strip(),
-                timestamp_content=timestamp_content.strip(),
+            content = render_template(
+                self.transcript_template,
+                {
+                    "filename": original_file.name,
+                    "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "audio_folder": self.config.get("audio_folder_name"),
+                    "transcript_content": transcript_content.strip(),
+                    "timestamp_content": timestamp_content.strip(),
+                },
             )
 
             with open(transcript_file, "w", encoding=self.encoding) as f:
@@ -334,12 +308,11 @@ class MarkdownTranscriptionSystem:
                     f"Could not fix ownership for {file_path}: {e}"
                 )
 
-    def generate_audio_embed_patterns(self, audio_name: str) -> List[str]:
+    def generate_audio_embed_patterns(self, audio_name: str) -> list[str]:
         """Generate regex patterns for finding audio embeds based on supported extensions"""
         patterns = []
 
         for ext in self.supported_extensions:
-            ext_clean = ext.lstrip(".")
             # Direct embed pattern
             patterns.append(
                 rf"!\[\[{re.escape(audio_name)}{re.escape(ext)}\]\]"
@@ -362,7 +335,7 @@ class MarkdownTranscriptionSystem:
 
         return patterns
 
-    def find_notes_with_audio(self, audio_name: str) -> List[Path]:
+    def find_notes_with_audio(self, audio_name: str) -> list[Path]:
         """Find all notes that contain references to a specific audio file"""
         notes_with_audio = []
         patterns = self.generate_audio_embed_patterns(audio_name)
@@ -390,7 +363,7 @@ class MarkdownTranscriptionSystem:
 
     def generate_transcript_link_replacements(
         self, audio_name: str
-    ) -> List[Tuple[str, str]]:
+    ) -> list[tuple[str, str]]:
         """Generate pattern-replacement pairs for adding transcript links"""
         replacements = []
 
@@ -399,8 +372,6 @@ class MarkdownTranscriptionSystem:
 
         # Generate replacements for each supported extension
         for ext in self.supported_extensions:
-            ext_clean = ext.lstrip(".")
-
             # Direct embed patterns
             pattern = rf"(!\[\[{re.escape(audio_name)}{re.escape(ext)}\]\])"
             replacement = f"\\1\n\n{transcript_link}"
